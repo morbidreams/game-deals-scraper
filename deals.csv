@@ -1,0 +1,4 @@
+title,developer,genre,price,original_price,discount_percent,description,thumbnail_url,store_url,scraped_at
+Rustbound Horizon,Coldpeak Studio,Action,11.99,29.99,60,A sci-fi shooter about the last convoy crossing a dying planet. (sample data),,https://store.steampowered.com/app/0000001/Rustbound_Horizon,2026-07-11T14:43:40+00:00
+Ferngrove,Hearth & Home Games,Simulation,9.89,17.99,45,A cozy farm-life sim with a slow-burn mystery. (sample data),,https://store.steampowered.com/app/0000002/Ferngrove,2026-07-11T14:43:40+00:00
+Nightbound Chronicles,Obsidian Loop,Role Playing,7.49,24.99,70,A turn-based RPG set across a fractured timeline. (sample data),,https://store.steampowered.com/app/0000003/Nightbound_Chronicles,2026-07-11T14:43:40+00:00

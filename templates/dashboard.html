@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Game Deals Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Patrick+Hand&family=Yuyu&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          base: "#FAF1E1",
+          surface: "#FFFBF3",
+          surface2: "#F2E4C9",
+          edge: "#E4D2AC",
+          ink: "#3A2A1E",
+          muted: "#8C7A60",
+          pink: "#E8577A",
+          mustard: "#D9A441",
+          rose: "#B8677E",
+        },
+        fontFamily: {
+          display: ['"Yuyu"', 'sans-serif'],
+          body: ['Patrick Hand', 'cursive', 'sans-serif'],
+          mono: ['"JetBrains Mono"', 'monospace'],
+        },
+      },
+    },
+  }
+</script>
+<style>
+  body { background-color: #FAF1E1; }
+  .barcode {
+    background-image: repeating-linear-gradient(
+      90deg, #E4D2AC 0px, #E4D2AC 2px, transparent 2px, transparent 6px,
+      #E4D2AC 6px, #E4D2AC 7px, transparent 7px, transparent 12px
+    );
+    height: 6px;
+    opacity: 0.7;
+  }
+  /* Punch-hole detail: a small circle "cut" out of the card's top-left corner */
+  .tag-hole {
+    position: absolute;
+    top: -10px;
+    left: 16px;
+    width: 20px;
+    height: 20px;
+    border-radius: 9999px;
+    background: #FAF1E1;
+    border: 2px solid #E4D2AC;
+    z-index: 10;
+  }
+  .best-deal .tag-hole { border-color: #D9A441; }
+  .deal-card { transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease; }
+  .deal-card:hover { transform: translateY(-4px); border-color: #D6BD8F; box-shadow: 0 8px 20px -8px rgba(58,42,30,0.18); }
+  .best-deal { box-shadow: 0 0 0 1px rgba(217,164,65,0.45); }
+  .ribbon {
+    transform: rotate(4deg);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .deal-card, .deal-card:hover { transition: none; transform: none; }
+  }
+  input[type="checkbox"].pill-check { position: absolute; opacity: 0; pointer-events: none; }
+  ::selection { background: #E8577A; color: #FFFBF3; }
+  input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
+</style>
+</head>
+<body class="bg-base text-ink font-body min-h-screen">
+
+<!-- Header -->
+<header class="sticky top-0 z-30 bg-base/95 backdrop-blur border-b border-edge">
+  <div class="max-w-7xl mx-auto px-5 py-4 flex items-center justify-between gap-4 flex-wrap">
+      <div>
+        <h1 class="font-display text-xl md:text-6xl tracking-tight text-ink leading-none">୨ৎ GAME DEALS</h1>
+        <h3 class="text-sm text-muted mt-1">⋆｡ﾟ☁︎｡⋆ Scraped from store.steampowered.com ⋆｡ ﾟ☾ ﾟ｡⋆</h3>
+      </div>
+
+    <div class="flex items-center gap-4 text-sm">
+      <div class="text-muted">
+        Last updated <span class="text-ink font-medium">{{ last_scraped }}</span>
+      </div>
+      <form method="post" action="{{ url_for('refresh') }}" class="flex items-center gap-2">
+        <input type="hidden" name="pages" value="3">
+        <button type="submit"
+          class="px-3 py-2 rounded-md bg-surface2 border border-edge hover:border-pink hover:text-pink transition-colors text-sm font-medium">
+          ↻ Refresh deals
+        </button>
+      </form>
+    </div>
+  </div>
+  <div class="barcode"></div>
+</header>
+
+<!-- Flash messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="max-w-7xl mx-auto px-5 pt-4">
+      {% for category, message in messages %}
+        <div class="text-sm rounded-md px-4 py-2 border {{ 'border-pink/50 bg-pink/10 text-pink' if category == 'error' else 'border-mustard/50 bg-mustard/10 text-mustard' }}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<main class="max-w-7xl mx-auto px-5 py-6">
+
+  {% if not has_data %}
+  <div class="mt-16 text-center max-w-lg mx-auto">
+    <div class="text-5xl mb-4">🏷️</div>
+    <h2 class="font-display text-xl mb-2">No deals scraped yet</h2>
+    <p class="text-muted text-sm leading-relaxed">
+      Run <code class="font-mono bg-surface2 px-1.5 py-0.5 rounded text-ink">python scraper.py</code>
+      from a terminal, or click <span class="text-ink">Refresh deals</span> above to fetch live prices from Steam now.
+    </p>
+  </div>
+  {% else %}
+
+  <!-- Filters -->
+  <form method="get" action="{{ url_for('dashboard') }}" class="bg-surface border border-edge rounded-xl p-4 md:p-5 mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+
+      <div class="md:col-span-4">
+        <label class="block text-xs uppercase tracking-wide text-muted mb-1.5">Search</label>
+        <input type="text" name="search" value="{{ search }}" placeholder="Title or developer…"
+          class="w-full bg-surface2 border border-edge rounded-md px-3 py-2 text-sm text-ink placeholder-muted focus:outline-none focus:ring-2 focus:ring-pink/60">
+      </div>
+
+      <div class="md:col-span-3">
+        <label class="block text-xs uppercase tracking-wide text-muted mb-1.5">Min price</label>
+        <input type="number" step="0.01" min="0" name="min_price" value="{{ min_price }}"
+          class="w-full bg-surface2 border border-edge rounded-md px-3 py-2 text-sm text-ink font-mono focus:outline-none focus:ring-2 focus:ring-pink/60">
+      </div>
+      <div class="md:col-span-3">
+        <label class="block text-xs uppercase tracking-wide text-muted mb-1.5">Max price</label>
+        <input type="number" step="0.01" min="0" name="max_price" value="{{ max_price }}"
+          class="w-full bg-surface2 border border-edge rounded-md px-3 py-2 text-sm text-ink font-mono focus:outline-none focus:ring-2 focus:ring-pink/60">
+      </div>
+
+      <div class="md:col-span-2">
+        <label class="block text-xs uppercase tracking-wide text-muted mb-1.5">Sort by</label>
+        <select name="sort" class="w-full bg-surface2 border border-edge rounded-md px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-pink/60">
+          <option value="discount_desc" {{ 'selected' if sort == 'discount_desc' }}>Biggest discount</option>
+          <option value="price_asc" {{ 'selected' if sort == 'price_asc' }}>Price: low to high</option>
+          <option value="price_desc" {{ 'selected' if sort == 'price_desc' }}>Price: high to low</option>
+          <option value="title_asc" {{ 'selected' if sort == 'title_asc' }}>Title: A–Z</option>
+        </select>
+      </div>
+
+      <div class="md:col-span-12">
+        <label class="block text-xs uppercase tracking-wide text-muted mb-2">Genre</label>
+        <div class="flex flex-wrap gap-2">
+          {% for genre in all_genres %}
+          <label class="relative cursor-pointer">
+            <input type="checkbox" name="genre" value="{{ genre }}" class="pill-check peer"
+              {{ 'checked' if genre in selected_genres }}>
+            <span class="block text-xs px-3 py-1.5 rounded-full border border-edge text-muted
+                         peer-checked:bg-rose/20 peer-checked:border-rose peer-checked:text-rose
+                         hover:border-rose/60 transition-colors">
+              {{ genre }}
+            </span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="md:col-span-12 flex items-center gap-3 pt-1">
+        <button type="submit" class="px-4 py-2 rounded-md bg-pink text-white font-semibold text-sm hover:bg-pink/90 transition-colors">
+          Apply filters
+        </button>
+        <a href="{{ url_for('dashboard') }}" class="text-sm text-muted hover:text-ink transition-colors">Clear all</a>
+      </div>
+    </div>
+  </form>
+
+  <!-- Result summary -->
+  <div class="flex items-center justify-between mb-4 text-sm text-muted flex-wrap gap-2">
+    <div>Showing <span class="text-ink font-medium">{{ shown_count }}</span> of {{ total_count }} deals</div>
+    <div class="flex items-center gap-1.5">
+      <span class="inline-block w-2 h-2 rounded-full bg-mustard"></span>
+      {{ best_deal_count }} deal{{ 's' if best_deal_count != 1 }} at {{ best_deal_threshold }}%+ off
+    </div>
+  </div>
+
+  {% if shown_count == 0 %}
+  <div class="text-center py-20 text-muted">
+    <p class="mb-2">No deals match your filters.</p>
+    <a href="{{ url_for('dashboard') }}" class="text-pink hover:underline text-sm">Clear filters</a>
+  </div>
+  {% else %}
+
+  <!-- Deal grid -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pt-2">
+    {% for deal in deals %}
+    <a href="{{ deal.store_url }}" target="_blank" rel="noopener noreferrer"
+       class="deal-card relative block bg-surface border border-edge rounded-xl overflow-hidden focus:outline-none focus:ring-2 focus:ring-pink
+              {{ 'best-deal' if deal.is_best_deal }}">
+      <div class="tag-hole"></div>
+
+      <div class="relative aspect-video bg-surface2">
+        {% if deal.thumbnail_url %}
+        <img src="{{ deal.thumbnail_url }}" alt="" loading="lazy" class="w-full h-full object-cover">
+        {% else %}
+        <div class="w-full h-full flex items-center justify-center text-3xl text-edge">🎮</div>
+        {% endif %}
+
+        {% if deal.discount_percent %}
+        <div class="ribbon absolute top-2 right-2 bg-pink text-white font-mono font-bold text-xs px-2 py-1 rounded shadow-lg">
+          −{{ deal.discount_percent }}%
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="p-4">
+        {% if deal.is_best_deal %}
+        <span class="inline-block text-[10px] font-semibold tracking-wide uppercase text-pink bg-pink/10 border border-pink/40 rounded px-1.5 py-0.5 mb-2">
+          ⋆.˚⟡ ࣪ ˖ Best deal . ࣪˚ ⟡˖⋆
+        </span>
+        {% endif %}
+
+        <h3 class="font-semibold text-sm text-ink leading-snug mb-1 line-clamp-2">{{ deal.title }}</h3>
+        <p class="text-xs text-muted mb-2">{{ deal.genre }}{% if deal.developer %} · {{ deal.developer }}{% endif %}</p>
+
+        {% if deal.description %}
+        <p class="text-xs text-muted/90 leading-relaxed mb-3 line-clamp-2">{{ deal.description }}</p>
+        {% endif %}
+
+        <div class="flex items-baseline gap-2 pt-1 border-t border-edge/70 mt-2">
+          {% if deal.original_price %}
+          <span class="text-xs font-mono text-muted line-through">${{ '%.2f'|format(deal.original_price) }}</span>
+          {% endif %}
+          <span class="text-base font-mono font-bold {{ 'text-mustard' if deal.is_best_deal else 'text-pink' }}">
+            {{ '$%.2f'|format(deal.price) if deal.price > 0 else 'Free' }}
+          </span>
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  {% endif %}
+  {% endif %}
+</main>
+
+<footer class="max-w-7xl mx-auto px-5 py-10 text-xs text-muted border-t border-edge mt-8">
+  Prices and discounts are pulled directly from Steam and may change at any time. Always confirm on the store page before buying.
+</footer>
+
+</body>
+</html>
