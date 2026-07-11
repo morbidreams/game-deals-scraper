@@ -76,3 +76,5 @@ different footing than a site that explicitly welcomes it.
 - **Best deal threshold**: `BEST_DEAL_THRESHOLD` in `app.py`.
 - **Auto-refresh on a schedule**: instead of clicking the button, you could cron a call to
   `python scraper.py` every hour.
+
+<img width="616" height="376" alt="game-deal-scraper" src="https://github.com/user-attachments/assets/a8365610-dfb6-4dc6-aca4-12bad0280555" />
